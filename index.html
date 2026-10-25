@@ -83,97 +83,165 @@
     </section>
   </main>
 
-  <script>
-    const chartEl = document.getElementById("chart");
-    const chart = LightweightCharts.createChart(chartEl, {
-      autoSize: true,
-      layout: {
-        background: { type: "solid", color: "#101a2b" },
-        textColor: "#cbd5e1"
-      },
-      grid: {
-        vertLines: { color: "#1e293b" },
-        horzLines: { color: "#1e293b" }
-      },
-      rightPriceScale: { borderColor: "#334155" },
-      timeScale: {
-        borderColor: "#334155",
-        timeVisible: true,
-        secondsVisible: false
-      },
-      crosshair: { mode: 0 }
-    });
 
-    const candles = chart.addSeries(LightweightCharts.CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderVisible: false,
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444"
-    });
+<script>
+const API_BASE = "https://mds-api.forexfactory.com/bars";
 
-    const labels = {
-      5: "5 minutes", 15: "15 minutes", 60: "1 hour",
-      240: "4 hours", 1440: "1 day"
-    };
+const intervals = {
+  5: "M5",
+  15: "M15",
+  60: "H1",
+  240: "H4",
+  1440: "D1"
+};
 
-    function makeDemoData(minutes) {
-      const now = Math.floor(Date.now() / 1000);
-      const interval = minutes * 60;
-      const end = Math.floor(now / interval) * interval;
-      const count = 250;
-      const result = [];
-      let price = 1.0850;
+const labels = {
+  5: "5 minutes",
+  15: "15 minutes",
+  60: "1 hour",
+  240: "4 hours",
+  1440: "1 day"
+};
 
-      // Fixed seed: deterministic demo prices, not actual market prices.
-      let seed = 91731 + minutes;
-      function random() {
-        seed = (seed * 16807) % 2147483647;
-        return (seed - 1) / 2147483646;
-      }
+const chart = LightweightCharts.createChart(
+  document.getElementById("chart"),
+  {
+    autoSize: true,
+    layout: {
+      background: { type: "solid", color: "#101a2b" },
+      textColor: "#cbd5e1"
+    },
+    grid: {
+      vertLines: { color: "#1e293b" },
+      horzLines: { color: "#1e293b" }
+    },
+    rightPriceScale: { borderColor: "#334155" },
+    timeScale: {
+      borderColor: "#334155",
+      timeVisible: true,
+      secondsVisible: false
+    },
+    crosshair: { mode: 0 }
+  }
+);
 
-      for (let i = count - 1; i >= 0; i--) {
-        const open = price;
-        const move = (random() - 0.49) * 0.0012;
-        const close = Math.max(0.5, open + move);
-        const high = Math.max(open, close) + random() * 0.00035;
-        const low = Math.min(open, close) - random() * 0.00035;
-        const time = end - i * interval;
+const candles = chart.addSeries(
+  LightweightCharts.CandlestickSeries,
+  {
+    upColor: "#22c55e",
+    downColor: "#ef4444",
+    borderVisible: false,
+    wickUpColor: "#22c55e",
+    wickDownColor: "#ef4444"
+  }
+);
 
-        result.push({
-          time,
-          open: +open.toFixed(5),
-          high: +high.toFixed(5),
-          low: +low.toFixed(5),
-          close: +close.toFixed(5)
-        });
-        price = close;
-      }
-      return result;
+const status = document.getElementById("status");
+const lastPrice = document.getElementById("lastPrice");
+const tfLabel = document.getElementById("tfLabel");
+
+let requestNumber = 0;
+
+async function loadCandles(minutes) {
+  const thisRequest = ++requestNumber;
+  status.textContent = "Loading real market data...";
+  status.style.color = "#fbbf24";
+
+  const params = new URLSearchParams({
+    to: String(Math.floor(Date.now() / 1000)),
+    interval: intervals[minutes],
+    instrument: "EUR/USD",
+    per_page: "200",
+    extra_fields: ""
+  });
+
+  try {
+    const response = await fetch(`${API_BASE}?${params}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    function setTimeframe(minutes) {
-      const data = makeDemoData(minutes);
-      candles.setData(data);
-      document.getElementById("tfLabel").textContent = labels[minutes];
-      document.getElementById("lastPrice").textContent =
-        data[data.length - 1].close.toFixed(5);
-      document.querySelectorAll("#timeframes button[data-tf]")
-        .forEach(button => button.classList.toggle(
-          "active", Number(button.dataset.tf) === minutes
-        ));
-      chart.timeScale().fitContent();
+    const result = await response.json();
+
+    if (!Array.isArray(result.data)) {
+      throw new Error("Unexpected API response format");
     }
 
-    document.querySelectorAll("#timeframes button[data-tf]").forEach(button => {
-      button.addEventListener("click", () => setTimeframe(Number(button.dataset.tf)));
+    const byTimestamp = new Map();
+
+    for (const bar of result.data) {
+      const time = Number(bar.timestamp);
+      const open = Number(bar.open);
+      const high = Number(bar.high);
+      const low = Number(bar.low);
+      const close = Number(bar.close);
+
+      if (
+        !Number.isFinite(time) ||
+        ![open, high, low, close].every(Number.isFinite) ||
+        high < Math.max(open, close) ||
+        low > Math.min(open, close) ||
+        high < low
+      ) continue;
+
+      byTimestamp.set(time, {
+        time,
+        open,
+        high,
+        low,
+        close
+      });
+    }
+
+    const data = [...byTimestamp.values()]
+      .sort((a, b) => a.time - b.time);
+
+    if (!data.length) {
+      throw new Error("No valid candles returned");
+    }
+
+    // Ignore an older request if the user switched timeframe.
+    if (thisRequest !== requestNumber) return;
+
+    candles.setData(data);
+    chart.timeScale().fitContent();
+
+    tfLabel.textContent = labels[minutes];
+    lastPrice.textContent = data[data.length - 1].close.toFixed(5);
+
+    document.querySelectorAll("button[data-tf]").forEach(button => {
+      button.classList.toggle(
+        "active",
+        Number(button.dataset.tf) === minutes
+      );
     });
 
-    document.getElementById("reset").addEventListener("click", () => {
-      chart.timeScale().fitContent();
-    });
+    status.textContent =
+      `FOREX FACTORY DATA · ${data.length} candles · ${intervals[minutes]}`;
+    status.style.color = "#4ade80";
 
-    setTimeframe(5);
-  </script>
+  } catch (error) {
+    if (thisRequest !== requestNumber) return;
+
+    status.textContent = "DATA ERROR — no verified live candles";
+    status.style.color = "#f87171";
+    console.error("Forex Factory candle request failed:", error);
+  }
+}
+
+document.querySelectorAll("button[data-tf]").forEach(button => {
+  button.addEventListener("click", () => {
+    loadCandles(Number(button.dataset.tf));
+  });
+});
+
+document.getElementById("reset").addEventListener("click", () => {
+  chart.timeScale().fitContent();
+});
+
+loadCandles(5);
+</script>
+
 </body>
 </html>
