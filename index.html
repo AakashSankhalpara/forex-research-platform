@@ -1,0 +1,179 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forex Research | EUR/USD</title>
+  <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #0b1220; color: #e5e7eb;
+      font-family: Arial, sans-serif;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; padding: 18px 22px;
+      border-bottom: 1px solid #263247;
+    }
+    h1 { margin: 0; font-size: 20px; }
+    .subtitle { color: #9ca3af; font-size: 12px; margin-top: 6px; }
+    main { padding: 18px; }
+    .toolbar {
+      display: flex; align-items: center; gap: 8px;
+      flex-wrap: wrap; margin-bottom: 14px;
+    }
+    button {
+      background: #172235; border: 1px solid #334155;
+      color: #e5e7eb; padding: 9px 13px; border-radius: 6px;
+      cursor: pointer;
+    }
+    button.active { background: #2563eb; border-color: #3b82f6; }
+    button:hover { border-color: #60a5fa; }
+    .status { font-size: 12px; color: #fbbf24; margin-left: auto; }
+    .panel {
+      background: #101a2b; border: 1px solid #263247;
+      border-radius: 10px; padding: 14px;
+    }
+    .market { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
+    .label { color: #94a3b8; font-size: 12px; }
+    .value { font-size: 17px; margin-top: 5px; }
+    #chart { height: 520px; width: 100%; }
+    footer { color: #94a3b8; font-size: 12px; padding-top: 12px; }
+    @media (max-width: 600px) {
+      main { padding: 10px; }
+      header { padding: 14px; }
+      #chart { height: 420px; }
+      .status { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Forex Research</h1>
+      <div class="subtitle">Historical chart workspace · EUR/USD</div>
+    </div>
+    <div class="subtitle">Research prototype v0.1</div>
+  </header>
+
+  <main>
+    <div class="toolbar" id="timeframes">
+      <button data-tf="5" class="active">5m</button>
+      <button data-tf="15">15m</button>
+      <button data-tf="60">1H</button>
+      <button data-tf="240">4H</button>
+      <button data-tf="1440">1D</button>
+      <button id="reset">Fit chart</button>
+      <span class="status" id="status">SIMULATED DATA — not live prices</span>
+    </div>
+
+    <section class="panel">
+      <div class="market">
+        <div><div class="label">Instrument</div><div class="value">EUR/USD</div></div>
+        <div><div class="label">Timeframe</div><div class="value" id="tfLabel">5 minutes</div></div>
+        <div><div class="label">Last sample close</div><div class="value" id="lastPrice">—</div></div>
+      </div>
+      <div id="chart"></div>
+      <footer>
+        Demo candles are generated locally. They are not historical market data.
+        The real-data connection will be added after this interface is deployed.
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const chartEl = document.getElementById("chart");
+    const chart = LightweightCharts.createChart(chartEl, {
+      autoSize: true,
+      layout: {
+        background: { type: "solid", color: "#101a2b" },
+        textColor: "#cbd5e1"
+      },
+      grid: {
+        vertLines: { color: "#1e293b" },
+        horzLines: { color: "#1e293b" }
+      },
+      rightPriceScale: { borderColor: "#334155" },
+      timeScale: {
+        borderColor: "#334155",
+        timeVisible: true,
+        secondsVisible: false
+      },
+      crosshair: { mode: 0 }
+    });
+
+    const candles = chart.addSeries(LightweightCharts.CandlestickSeries, {
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderVisible: false,
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444"
+    });
+
+    const labels = {
+      5: "5 minutes", 15: "15 minutes", 60: "1 hour",
+      240: "4 hours", 1440: "1 day"
+    };
+
+    function makeDemoData(minutes) {
+      const now = Math.floor(Date.now() / 1000);
+      const interval = minutes * 60;
+      const end = Math.floor(now / interval) * interval;
+      const count = 250;
+      const result = [];
+      let price = 1.0850;
+
+      // Fixed seed: deterministic demo prices, not actual market prices.
+      let seed = 91731 + minutes;
+      function random() {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      }
+
+      for (let i = count - 1; i >= 0; i--) {
+        const open = price;
+        const move = (random() - 0.49) * 0.0012;
+        const close = Math.max(0.5, open + move);
+        const high = Math.max(open, close) + random() * 0.00035;
+        const low = Math.min(open, close) - random() * 0.00035;
+        const time = end - i * interval;
+
+        result.push({
+          time,
+          open: +open.toFixed(5),
+          high: +high.toFixed(5),
+          low: +low.toFixed(5),
+          close: +close.toFixed(5)
+        });
+        price = close;
+      }
+      return result;
+    }
+
+    function setTimeframe(minutes) {
+      const data = makeDemoData(minutes);
+      candles.setData(data);
+      document.getElementById("tfLabel").textContent = labels[minutes];
+      document.getElementById("lastPrice").textContent =
+        data[data.length - 1].close.toFixed(5);
+      document.querySelectorAll("#timeframes button[data-tf]")
+        .forEach(button => button.classList.toggle(
+          "active", Number(button.dataset.tf) === minutes
+        ));
+      chart.timeScale().fitContent();
+    }
+
+    document.querySelectorAll("#timeframes button[data-tf]").forEach(button => {
+      button.addEventListener("click", () => setTimeframe(Number(button.dataset.tf)));
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      chart.timeScale().fitContent();
+    });
+
+    setTimeframe(5);
+  </script>
+</body>
+</html>
