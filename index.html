@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forex Research | EUR/USD</title>
+  <title>Forex Research | EMA Directional Riding</title>
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -32,15 +32,37 @@
     button.active { background: #2563eb; border-color: #3b82f6; }
     button:hover { border-color: #60a5fa; }
     .status { font-size: 12px; color: #fbbf24; margin-left: auto; }
-    .panel {
+    .panel, .strategy {
       background: #101a2b; border: 1px solid #263247;
       border-radius: 10px; padding: 14px;
     }
-    .market { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
+    .strategy {
+      display: flex; gap: 14px; align-items: end;
+      flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .strategy label {
+      display: flex; flex-direction: column; gap: 6px;
+      color: #94a3b8; font-size: 12px;
+    }
+    .strategy input[type="number"] {
+      width: 100px; padding: 9px; border-radius: 6px;
+      border: 1px solid #334155; background: #0b1220;
+      color: #e5e7eb; font-size: 14px;
+    }
+    .strategy .toggle {
+      flex-direction: row; align-items: center;
+      padding-bottom: 10px;
+    }
+    .market {
+      display: flex; gap: 20px; flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
     .label { color: #94a3b8; font-size: 12px; }
-    .value { font-size: 17px; margin-top: 5px; }
+    .value { font-size: 16px; margin-top: 5px; }
+    .long { color: #4ade80; }
+    .short { color: #f87171; }
     #chart { height: 520px; width: 100%; }
-    footer { color: #94a3b8; font-size: 12px; padding-top: 12px; }
+    footer { color: #94a3b8; font-size: 12px; padding-top: 12px; line-height: 1.6; }
     @media (max-width: 600px) {
       main { padding: 10px; }
       header { padding: 14px; }
@@ -50,41 +72,81 @@
   </style>
 </head>
 <body>
-  <header>
+<header>
+  <div>
+    <h1>Forex Research</h1>
+    <div class="subtitle">EUR/USD · EMA Directional Riding</div>
+  </div>
+  <div class="subtitle">Visual strategy research</div>
+</header>
+
+<main>
+  <div class="toolbar" id="timeframes">
+    <button data-tf="5" class="active">5m</button>
+    <button data-tf="15">15m</button>
+    <button data-tf="60">1H</button>
+    <button data-tf="240">4H</button>
+    <button data-tf="1440">1D</button>
+    <button id="reset">Fit chart</button>
+    <span class="status" id="status">Loading market data...</span>
+  </div>
+
+  <section class="strategy">
+    <label class="toggle">
+      <input id="emaEnabled" type="checkbox" checked>
+      Show EMA strategy
+    </label>
+    <label>
+      EMA period
+      <input id="emaLength" type="number" min="1" max="500" value="50">
+    </label>
+    <label>
+      Recent EMA high/low lookback
+      <input id="emaLookback" type="number" min="2" max="500" value="20">
+    </label>
     <div>
-      <h1>Forex Research</h1>
-      <div class="subtitle">Historical chart workspace · EUR/USD</div>
+      <div class="label">Current direction</div>
+      <div class="value" id="direction">WAITING</div>
     </div>
-    <div class="subtitle">Research prototype v0.1</div>
-  </header>
-
-  <main>
-    <div class="toolbar" id="timeframes">
-      <button data-tf="5" class="active">5m</button>
-      <button data-tf="15">15m</button>
-      <button data-tf="60">1H</button>
-      <button data-tf="240">4H</button>
-      <button data-tf="1440">1D</button>
-      <button id="reset">Fit chart</button>
-      <span class="status" id="status">SIMULATED DATA — not live prices</span>
+    <div>
+      <div class="label">Last confirmed signal</div>
+      <div class="value" id="lastSignal">—</div>
     </div>
+  </section>
 
-    <section class="panel">
-      <div class="market">
-        <div><div class="label">Instrument</div><div class="value">EUR/USD</div></div>
-        <div><div class="label">Timeframe</div><div class="value" id="tfLabel">5 minutes</div></div>
-        <div><div class="label">Last sample close</div><div class="value" id="lastPrice">—</div></div>
+  <section class="panel">
+    <div class="market">
+      <div>
+        <div class="label">Instrument</div>
+        <div class="value">EUR/USD</div>
       </div>
-      <div id="chart"></div>
-      <footer>
-        Demo candles are generated locally. They are not historical market data.
-        The real-data connection will be added after this interface is deployed.
-      </footer>
-    </section>
-  </main>
-
+      <div>
+        <div class="label">Timeframe</div>
+        <div class="value" id="tfLabel">5 minutes</div>
+      </div>
+      <div>
+        <div class="label">Last candle close</div>
+        <div class="value" id="lastPrice">—</div>
+      </div>
+      <div>
+        <div class="label">Loaded candles</div>
+        <div class="value" id="barCount">—</div>
+      </div>
+    </div>
+    <div id="chart"></div>
+    <footer>
+      Orange = EMA. Green dashed = recent EMA high. Red dashed = recent EMA low.
+      LONG occurs when the EMA crosses above its previous lookback high;
+      SHORT occurs when it crosses below its previous lookback low.
+      Signals are confirmed using completed candles. This is a visual indicator
+      only: no fixed SL, TP, or real orders are used.
+    </footer>
+  </section>
+</main>
 
 <script>
+"use strict";
+
 const API_BASE = "https://mds-api.forexfactory.com/bars";
 
 const intervals = {
@@ -103,27 +165,26 @@ const labels = {
   1440: "1 day"
 };
 
-const chart = LightweightCharts.createChart(
-  document.getElementById("chart"),
-  {
-    autoSize: true,
-    layout: {
-      background: { type: "solid", color: "#101a2b" },
-      textColor: "#cbd5e1"
-    },
-    grid: {
-      vertLines: { color: "#1e293b" },
-      horzLines: { color: "#1e293b" }
-    },
-    rightPriceScale: { borderColor: "#334155" },
-    timeScale: {
-      borderColor: "#334155",
-      timeVisible: true,
-      secondsVisible: false
-    },
-    crosshair: { mode: 0 }
-  }
-);
+const chartElement = document.getElementById("chart");
+
+const chart = LightweightCharts.createChart(chartElement, {
+  autoSize: true,
+  layout: {
+    background: { type: "solid", color: "#101a2b" },
+    textColor: "#cbd5e1"
+  },
+  grid: {
+    vertLines: { color: "#1e293b" },
+    horzLines: { color: "#1e293b" }
+  },
+  rightPriceScale: { borderColor: "#334155" },
+  timeScale: {
+    borderColor: "#334155",
+    timeVisible: true,
+    secondsVisible: false
+  },
+  crosshair: { mode: 0 }
+});
 
 const candles = chart.addSeries(
   LightweightCharts.CandlestickSeries,
@@ -136,16 +197,51 @@ const candles = chart.addSeries(
   }
 );
 
+const emaLine = chart.addSeries(LightweightCharts.LineSeries, {
+  color: "#f59e0b",
+  lineWidth: 2,
+  title: "EMA"
+});
+
+const highLine = chart.addSeries(LightweightCharts.LineSeries, {
+  color: "rgba(34,197,94,0.7)",
+  lineWidth: 1,
+  lineStyle: LightweightCharts.LineStyle.Dashed,
+  title: "Recent EMA High"
+});
+
+const lowLine = chart.addSeries(LightweightCharts.LineSeries, {
+  color: "rgba(248,113,113,0.7)",
+  lineWidth: 1,
+  lineStyle: LightweightCharts.LineStyle.Dashed,
+  title: "Recent EMA Low"
+});
+
+const markerPlugin = LightweightCharts.createSeriesMarkers(candles, []);
+
 const status = document.getElementById("status");
-const lastPrice = document.getElementById("lastPrice");
 const tfLabel = document.getElementById("tfLabel");
+const lastPrice = document.getElementById("lastPrice");
+const barCount = document.getElementById("barCount");
+const emaEnabled = document.getElementById("emaEnabled");
+const emaLengthInput = document.getElementById("emaLength");
+const lookbackInput = document.getElementById("emaLookback");
+const directionDisplay = document.getElementById("direction");
+const lastSignalDisplay = document.getElementById("lastSignal");
 
 let requestNumber = 0;
+let currentCandles = [];
+let currentTimeframe = 5;
+
+function setStatus(message, color = "#fbbf24") {
+  status.textContent = message;
+  status.style.color = color;
+}
 
 async function loadCandles(minutes) {
-  const thisRequest = ++requestNumber;
-  status.textContent = "Loading real market data...";
-  status.style.color = "#fbbf24";
+  const requestId = ++requestNumber;
+  currentTimeframe = minutes;
+  setStatus("Loading Forex Factory candles...");
 
   const params = new URLSearchParams({
     to: String(Math.floor(Date.now() / 1000)),
@@ -165,10 +261,10 @@ async function loadCandles(minutes) {
     const result = await response.json();
 
     if (!Array.isArray(result.data)) {
-      throw new Error("Unexpected API response format");
+      throw new Error("Unexpected API response");
     }
 
-    const byTimestamp = new Map();
+    const byTime = new Map();
 
     for (const bar of result.data) {
       const time = Number(bar.timestamp);
@@ -185,30 +281,20 @@ async function loadCandles(minutes) {
         high < low
       ) continue;
 
-      byTimestamp.set(time, {
-        time,
-        open,
-        high,
-        low,
-        close
-      });
+      byTime.set(time, { time, open, high, low, close });
     }
 
-    const data = [...byTimestamp.values()]
-      .sort((a, b) => a.time - b.time);
+    const data = [...byTime.values()].sort((a, b) => a.time - b.time);
 
-    if (!data.length) {
-      throw new Error("No valid candles returned");
-    }
+    if (!data.length) throw new Error("No valid candles returned");
+    if (requestId !== requestNumber) return;
 
-    // Ignore an older request if the user switched timeframe.
-    if (thisRequest !== requestNumber) return;
-
+    currentCandles = data;
     candles.setData(data);
-    chart.timeScale().fitContent();
 
     tfLabel.textContent = labels[minutes];
     lastPrice.textContent = data[data.length - 1].close.toFixed(5);
+    barCount.textContent = String(data.length);
 
     document.querySelectorAll("button[data-tf]").forEach(button => {
       button.classList.toggle(
@@ -217,17 +303,126 @@ async function loadCandles(minutes) {
       );
     });
 
-    status.textContent =
-      `FOREX FACTORY DATA · ${data.length} candles · ${intervals[minutes]}`;
-    status.style.color = "#4ade80";
+    renderStrategy();
+    chart.timeScale().fitContent();
 
+    setStatus(
+      `FOREX FACTORY DATA · ${data.length} candles · ${intervals[minutes]}`,
+      "#4ade80"
+    );
   } catch (error) {
-    if (thisRequest !== requestNumber) return;
-
-    status.textContent = "DATA ERROR — no verified live candles";
-    status.style.color = "#f87171";
-    console.error("Forex Factory candle request failed:", error);
+    if (requestId !== requestNumber) return;
+    setStatus("DATA ERROR — unable to load candles", "#f87171");
+    console.error("Candle API error:", error);
   }
+}
+
+function renderStrategy() {
+  if (!emaEnabled.checked || !currentCandles.length) {
+    emaLine.setData([]);
+    highLine.setData([]);
+    lowLine.setData([]);
+    markerPlugin.setMarkers([]);
+    directionDisplay.textContent = "DISABLED";
+    directionDisplay.className = "value";
+    lastSignalDisplay.textContent = "—";
+    return;
+  }
+
+  const length = Math.max(
+    1, Math.min(500, Number(emaLengthInput.value) || 50)
+  );
+  const lookback = Math.max(
+    2, Math.min(500, Number(lookbackInput.value) || 20)
+  );
+
+  const alpha = 2 / (length + 1);
+  const emaValues = [];
+  let ema = currentCandles[0].close;
+
+  for (let i = 0; i < currentCandles.length; i++) {
+    ema = i === 0
+      ? currentCandles[i].close
+      : alpha * currentCandles[i].close + (1 - alpha) * ema;
+    emaValues.push(ema);
+  }
+
+  const emaData = currentCandles.map((bar, i) => ({
+    time: bar.time,
+    value: emaValues[i]
+  }));
+
+  const highData = [];
+  const lowData = [];
+  const markers = [];
+
+  let direction = 0;
+  let lastSignal = null;
+
+  // Treat the newest bar as potentially unfinished.
+  // Only candles followed by another candle can generate confirmed signals.
+  const lastConfirmedIndex = currentCandles.length - 2;
+
+  for (let i = 0; i <= lastConfirmedIndex; i++) {
+    if (i < lookback) continue;
+
+    const previousEmaValues = emaValues.slice(i - lookback, i);
+    const recentHigh = Math.max(...previousEmaValues);
+    const recentLow = Math.min(...previousEmaValues);
+
+    highData.push({ time: currentCandles[i].time, value: recentHigh });
+    lowData.push({ time: currentCandles[i].time, value: recentLow });
+
+    const longSignal =
+      emaValues[i] > recentHigh &&
+      emaValues[i - 1] <= recentHigh;
+
+    const shortSignal =
+      emaValues[i] < recentLow &&
+      emaValues[i - 1] >= recentLow;
+
+    if (longSignal) {
+      direction = 1;
+      lastSignal = { time: currentCandles[i].time, side: "LONG" };
+      markers.push({
+        time: currentCandles[i].time,
+        position: "belowBar",
+        color: "#16a34a",
+        shape: "arrowUp",
+        text: "LONG"
+      });
+    } else if (shortSignal) {
+      direction = -1;
+      lastSignal = { time: currentCandles[i].time, side: "SHORT" };
+      markers.push({
+        time: currentCandles[i].time,
+        position: "aboveBar",
+        color: "#dc2626",
+        shape: "arrowDown",
+        text: "SHORT"
+      });
+    }
+  }
+
+  emaLine.setData(emaData);
+  highLine.setData(highData);
+  lowLine.setData(lowData);
+  markerPlugin.setMarkers(markers);
+
+  if (direction === 1) {
+    directionDisplay.textContent = "LONG";
+    directionDisplay.className = "value long";
+  } else if (direction === -1) {
+    directionDisplay.textContent = "SHORT";
+    directionDisplay.className = "value short";
+  } else {
+    directionDisplay.textContent = "WAITING";
+    directionDisplay.className = "value";
+  }
+
+  lastSignalDisplay.textContent = lastSignal
+    ? `${lastSignal.side} · ${new Date(lastSignal.time * 1000).toLocaleString()}`
+    : "No confirmed signal";
 }
 
 document.querySelectorAll("button[data-tf]").forEach(button => {
@@ -240,8 +435,11 @@ document.getElementById("reset").addEventListener("click", () => {
   chart.timeScale().fitContent();
 });
 
+[emaEnabled, emaLengthInput, lookbackInput].forEach(control => {
+  control.addEventListener("change", renderStrategy);
+});
+
 loadCandles(5);
 </script>
-
 </body>
 </html>
