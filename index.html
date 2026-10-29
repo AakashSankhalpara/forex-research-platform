@@ -9,65 +9,112 @@
   <style>
     * { box-sizing: border-box; }
     body {
-      margin: 0; background: #0b1220; color: #e5e7eb;
+      margin: 0;
+      background: #0b1220;
+      color: #e5e7eb;
       font-family: Arial, sans-serif;
     }
     header {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; flex-wrap: wrap; padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 18px 22px;
       border-bottom: 1px solid #263247;
     }
     h1 { margin: 0; font-size: 20px; }
     .subtitle { color: #9ca3af; font-size: 12px; margin-top: 6px; }
     main { padding: 18px; }
     .toolbar {
-      display: flex; align-items: center; gap: 8px;
-      flex-wrap: wrap; margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
     }
     button {
-      background: #172235; border: 1px solid #334155;
-      color: #e5e7eb; padding: 9px 13px; border-radius: 6px;
+      background: #172235;
+      border: 1px solid #334155;
+      color: #e5e7eb;
+      padding: 9px 13px;
+      border-radius: 6px;
       cursor: pointer;
     }
     button.active { background: #2563eb; border-color: #3b82f6; }
     button:hover { border-color: #60a5fa; }
     .status { font-size: 12px; color: #fbbf24; margin-left: auto; }
     .panel, .strategy {
-      background: #101a2b; border: 1px solid #263247;
-      border-radius: 10px; padding: 14px;
+      background: #101a2b;
+      border: 1px solid #263247;
+      border-radius: 10px;
+      padding: 14px;
     }
     .strategy {
-      display: flex; gap: 14px; align-items: end;
-      flex-wrap: wrap; margin-bottom: 14px;
+      display: flex;
+      gap: 18px;
+      align-items: end;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
     }
     .strategy label {
-      display: flex; flex-direction: column; gap: 6px;
-      color: #94a3b8; font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: #94a3b8;
+      font-size: 12px;
     }
     .strategy input[type="number"] {
-      width: 100px; padding: 9px; border-radius: 6px;
-      border: 1px solid #334155; background: #0b1220;
-      color: #e5e7eb; font-size: 14px;
+      width: 100px;
+      padding: 9px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #0b1220;
+      color: #e5e7eb;
+      font-size: 14px;
     }
     .strategy .toggle {
-      flex-direction: row; align-items: center;
+      flex-direction: row;
+      align-items: center;
       padding-bottom: 10px;
     }
     .market {
-      display: flex; gap: 20px; flex-wrap: wrap;
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
       margin-bottom: 12px;
     }
     .label { color: #94a3b8; font-size: 12px; }
-    .value { font-size: 16px; margin-top: 5px; }
-    .long { color: #4ade80; }
-    .short { color: #f87171; }
+    .value { font-size: 16px; margin-top: 5px; overflow-wrap: anywhere; }
+    .long, .positive { color: #4ade80; }
+    .short, .negative { color: #f87171; }
     #chart { height: 520px; width: 100%; }
-    footer { color: #94a3b8; font-size: 12px; padding-top: 12px; line-height: 1.6; }
+    footer {
+      color: #94a3b8;
+      font-size: 12px;
+      padding-top: 12px;
+      line-height: 1.7;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      background: #0b1220;
+      border: 1px solid #263247;
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 0;
+    }
+    .stat .value { font-size: 18px; font-weight: bold; }
     @media (max-width: 600px) {
       main { padding: 10px; }
       header { padding: 14px; }
       #chart { height: 420px; }
       .status { margin-left: 0; width: 100%; }
+      .strategy { gap: 14px; }
     }
   </style>
 </head>
@@ -77,7 +124,7 @@
     <h1>Forex Research</h1>
     <div class="subtitle">EUR/USD · EMA Directional Riding</div>
   </div>
-  <div class="subtitle">Visual strategy research</div>
+  <div class="subtitle">Single alternating signals · Movement tracking</div>
 </header>
 
 <main>
@@ -101,7 +148,7 @@
       <input id="emaLength" type="number" min="1" max="500" value="50">
     </label>
     <label>
-      Recent EMA high/low lookback
+      EMA high/low lookback
       <input id="emaLookback" type="number" min="2" max="500" value="20">
     </label>
     <div>
@@ -111,6 +158,29 @@
     <div>
       <div class="label">Last confirmed signal</div>
       <div class="value" id="lastSignal">—</div>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="stat">
+      <div class="label">Latest completed move</div>
+      <div class="value" id="lastMove">—</div>
+      <div class="label" id="lastMovePips">Waiting for opposite signal</div>
+    </div>
+    <div class="stat">
+      <div class="label">Cumulative net points</div>
+      <div class="value" id="totalPoints">0.0</div>
+      <div class="label">Sum of completed directional moves</div>
+    </div>
+    <div class="stat">
+      <div class="label">Cumulative net pips</div>
+      <div class="value" id="totalPips">0.0</div>
+      <div class="label">1 pip = 10 EUR/USD points</div>
+    </div>
+    <div class="stat">
+      <div class="label">Completed moves</div>
+      <div class="value" id="moveCount">0</div>
+      <div class="label">Between alternating signals</div>
     </div>
   </section>
 
@@ -136,10 +206,12 @@
     <div id="chart"></div>
     <footer>
       Orange = EMA. Green dashed = recent EMA high. Red dashed = recent EMA low.
-      LONG occurs when the EMA crosses above its previous lookback high;
-      SHORT occurs when it crosses below its previous lookback low.
-      Signals are confirmed using completed candles. This is a visual indicator
-      only: no fixed SL, TP, or real orders are used.
+      A LONG is recorded when the EMA crosses above its recent high; a SHORT
+      when it crosses below its recent low. Duplicate signals in the same
+      direction are ignored until the opposite signal appears.
+      Movement is calculated from one signal candle's close to the next
+      opposite signal candle's close. No SL, TP, spread, commission, or real
+      orders are included. These figures are theoretical indicator measurements.
     </footer>
   </section>
 </main>
@@ -148,6 +220,10 @@
 "use strict";
 
 const API_BASE = "https://mds-api.forexfactory.com/bars";
+
+// EUR/USD price precision: 0.00001 per point, 0.0001 per pip.
+const POINTS_PER_PRICE_UNIT = 100000;
+const PIPS_PER_PRICE_UNIT = 10000;
 
 const intervals = {
   5: "M5",
@@ -228,6 +304,11 @@ const emaLengthInput = document.getElementById("emaLength");
 const lookbackInput = document.getElementById("emaLookback");
 const directionDisplay = document.getElementById("direction");
 const lastSignalDisplay = document.getElementById("lastSignal");
+const lastMoveDisplay = document.getElementById("lastMove");
+const lastMovePipsDisplay = document.getElementById("lastMovePips");
+const totalPointsDisplay = document.getElementById("totalPoints");
+const totalPipsDisplay = document.getElementById("totalPips");
+const moveCountDisplay = document.getElementById("moveCount");
 
 let requestNumber = 0;
 let currentCandles = [];
@@ -236,6 +317,27 @@ let currentTimeframe = 5;
 function setStatus(message, color = "#fbbf24") {
   status.textContent = message;
   status.style.color = color;
+}
+
+function formatSigned(value) {
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
+}
+
+function setMovementStyle(element, value) {
+  element.classList.remove("positive", "negative");
+  if (value > 0) element.classList.add("positive");
+  if (value < 0) element.classList.add("negative");
+}
+
+function resetStats() {
+  lastMoveDisplay.textContent = "—";
+  lastMovePipsDisplay.textContent = "Waiting for opposite signal";
+  totalPointsDisplay.textContent = "0.0";
+  totalPipsDisplay.textContent = "0.0";
+  moveCountDisplay.textContent = "0";
+  setMovementStyle(lastMoveDisplay, 0);
+  setMovementStyle(totalPointsDisplay, 0);
+  setMovementStyle(totalPipsDisplay, 0);
 }
 
 async function loadCandles(minutes) {
@@ -326,12 +428,14 @@ function renderStrategy() {
     directionDisplay.textContent = "DISABLED";
     directionDisplay.className = "value";
     lastSignalDisplay.textContent = "—";
+    resetStats();
     return;
   }
 
   const length = Math.max(
     1, Math.min(500, Number(emaLengthInput.value) || 50)
   );
+
   const lookback = Math.max(
     2, Math.min(500, Number(lookbackInput.value) || 20)
   );
@@ -344,6 +448,7 @@ function renderStrategy() {
     ema = i === 0
       ? currentCandles[i].close
       : alpha * currentCandles[i].close + (1 - alpha) * ema;
+
     emaValues.push(ema);
   }
 
@@ -356,22 +461,34 @@ function renderStrategy() {
   const lowData = [];
   const markers = [];
 
+  // 0 = no signal yet, 1 = LONG, -1 = SHORT.
+  // Direction persists through the complete historical scan.
   let direction = 0;
+  let previousSignal = null;
   let lastSignal = null;
+  let latestMovePoints = null;
+  let totalNetPoints = 0;
+  let completedMoves = 0;
 
-  // Treat the newest bar as potentially unfinished.
-  // Only candles followed by another candle can generate confirmed signals.
+  // Exclude the newest bar because it may still be forming.
   const lastConfirmedIndex = currentCandles.length - 2;
 
-  for (let i = 0; i <= lastConfirmedIndex; i++) {
+  for (let i = 1; i <= lastConfirmedIndex; i++) {
     if (i < lookback) continue;
 
     const previousEmaValues = emaValues.slice(i - lookback, i);
     const recentHigh = Math.max(...previousEmaValues);
     const recentLow = Math.min(...previousEmaValues);
 
-    highData.push({ time: currentCandles[i].time, value: recentHigh });
-    lowData.push({ time: currentCandles[i].time, value: recentLow });
+    highData.push({
+      time: currentCandles[i].time,
+      value: recentHigh
+    });
+
+    lowData.push({
+      time: currentCandles[i].time,
+      value: recentLow
+    });
 
     const longSignal =
       emaValues[i] > recentHigh &&
@@ -381,27 +498,59 @@ function renderStrategy() {
       emaValues[i] < recentLow &&
       emaValues[i - 1] >= recentLow;
 
-    if (longSignal) {
-      direction = 1;
-      lastSignal = { time: currentCandles[i].time, side: "LONG" };
-      markers.push({
-        time: currentCandles[i].time,
-        position: "belowBar",
-        color: "#16a34a",
-        shape: "arrowUp",
-        text: "LONG"
-      });
-    } else if (shortSignal) {
-      direction = -1;
-      lastSignal = { time: currentCandles[i].time, side: "SHORT" };
-      markers.push({
-        time: currentCandles[i].time,
-        position: "aboveBar",
-        color: "#dc2626",
-        shape: "arrowDown",
-        text: "SHORT"
-      });
+    // Record a signal only if it changes the current direction.
+    // Repeated signals in the same direction are ignored.
+    let newSide = null;
+
+    if (longSignal && direction !== 1) {
+      newSide = "LONG";
+    } else if (shortSignal && direction !== -1) {
+      newSide = "SHORT";
     }
+
+    if (!newSide) continue;
+
+    const signalBar = currentCandles[i];
+    const signalPrice = signalBar.close;
+    const newDirection = newSide === "LONG" ? 1 : -1;
+
+    // Complete the previous directional leg when the opposite signal arrives.
+    if (previousSignal !== null) {
+      let priceMove;
+
+      if (previousSignal.side === "LONG") {
+        priceMove = signalPrice - previousSignal.price;
+      } else {
+        priceMove = previousSignal.price - signalPrice;
+      }
+
+      const legPoints = priceMove * POINTS_PER_PRICE_UNIT;
+
+      latestMovePoints = legPoints;
+      totalNetPoints += legPoints;
+      completedMoves += 1;
+    }
+
+    direction = newDirection;
+    lastSignal = {
+      time: signalBar.time,
+      side: newSide,
+      price: signalPrice
+    };
+
+    previousSignal = {
+      time: signalBar.time,
+      side: newSide,
+      price: signalPrice
+    };
+
+    markers.push({
+      time: signalBar.time,
+      position: newSide === "LONG" ? "belowBar" : "aboveBar",
+      color: newSide === "LONG" ? "#16a34a" : "#dc2626",
+      shape: newSide === "LONG" ? "arrowUp" : "arrowDown",
+      text: newSide
+    });
   }
 
   emaLine.setData(emaData);
@@ -421,8 +570,35 @@ function renderStrategy() {
   }
 
   lastSignalDisplay.textContent = lastSignal
-    ? `${lastSignal.side} · ${new Date(lastSignal.time * 1000).toLocaleString()}`
+    ? `${lastSignal.side} · ${lastSignal.price.toFixed(5)} · ${
+        new Date(lastSignal.time * 1000).toLocaleString()
+      }`
     : "No confirmed signal";
+
+  if (latestMovePoints !== null) {
+    const latestMovePips = latestMovePoints / 10;
+
+    lastMoveDisplay.textContent = `${formatSigned(latestMovePoints)} points`;
+    lastMovePipsDisplay.textContent =
+      `${formatSigned(latestMovePips)} pips · last completed move`;
+
+    setMovementStyle(lastMoveDisplay, latestMovePoints);
+  } else {
+    lastMoveDisplay.textContent = "—";
+    lastMovePipsDisplay.textContent =
+      "First signal found; waiting for opposite signal";
+
+    setMovementStyle(lastMoveDisplay, 0);
+  }
+
+  const totalNetPips = totalNetPoints / 10;
+
+  totalPointsDisplay.textContent = formatSigned(totalNetPoints);
+  totalPipsDisplay.textContent = formatSigned(totalNetPips);
+  moveCountDisplay.textContent = String(completedMoves);
+
+  setMovementStyle(totalPointsDisplay, totalNetPoints);
+  setMovementStyle(totalPipsDisplay, totalNetPips);
 }
 
 document.querySelectorAll("button[data-tf]").forEach(button => {
