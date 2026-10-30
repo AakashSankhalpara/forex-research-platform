@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "forex-research-platform",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-30",
+  "r2_buckets": [
+    {
+      "binding": "MARKET_DATA",
+      "bucket_name": "forex-market-data"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGIN": "https://forex-research-platform.sankhalparaaakash1.workers.dev"
+  }
+}
